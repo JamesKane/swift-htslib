@@ -65,6 +65,128 @@ public struct HTSFile: ~Copyable, @unchecked Sendable {
         return hts_set_thread_pool(pointer, &tp)
     }
 
+    // MARK: - SAM/BAM writing
+
+    /// Write a single alignment record to this file.
+    ///
+    /// - Parameters:
+    ///   - record: The ``BAMRecord`` to write.
+    ///   - header: The ``SAMHeader`` for the output file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func write(record: borrowing BAMRecord, header: SAMHeader) throws {
+        let ret = sam_write1(pointer, header.pointer, record.pointer)
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Format a single alignment record as a SAM text line.
+    ///
+    /// - Parameters:
+    ///   - record: The ``BAMRecord`` to format.
+    ///   - header: The ``SAMHeader`` for the output.
+    /// - Returns: The SAM-formatted string, or `nil` on failure.
+    public func format(record: borrowing BAMRecord, header: SAMHeader) -> String? {
+        var ks = kstring_t(l: 0, m: 0, s: nil)
+        let ret = sam_format1(header.pointer, record.pointer, &ks)
+        guard ret >= 0, let s = ks.s else {
+            free(ks.s)
+            return nil
+        }
+        let result = String(cString: s)
+        free(ks.s)
+        return result
+    }
+
+    // MARK: - VCF/BCF writing
+
+    /// Write a single variant record to this file.
+    ///
+    /// - Parameters:
+    ///   - record: The ``VCFRecord`` to write.
+    ///   - header: The ``VCFHeader`` for the output file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func write(record: borrowing VCFRecord, header: VCFHeader) throws {
+        let ret = hts_shim_bcf_write1(pointer, header.pointer, record.pointer)
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    // MARK: - Generic file operations
+
+    /// Set the FASTA reference index file for CRAM decoding/encoding.
+    ///
+    /// - Parameter path: Path to the `.fai` file.
+    /// - Throws: ``HTSError/invalidArgument(message:)`` on failure.
+    public func setFaiFilename(_ path: String) throws {
+        let ret = path.withCString { hts_set_fai_filename(pointer, $0) }
+        if ret < 0 {
+            throw HTSError.invalidArgument(message: "Failed to set FAI filename: \(path)")
+        }
+    }
+
+    /// Check whether the file has a valid EOF marker.
+    ///
+    /// - Returns: 1 if the EOF marker is present, 0 if absent, negative on error.
+    public func checkEOF() -> Int32 {
+        hts_check_EOF(pointer)
+    }
+
+    /// Flush any buffered data to the file.
+    ///
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func flush() throws {
+        let ret = hts_flush(pointer)
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    // MARK: - CRAM / format options
+
+    /// Set an integer CRAM option on this file.
+    ///
+    /// - Parameters:
+    ///   - option: The ``CRAMOption`` to set.
+    ///   - intValue: The integer value.
+    /// - Throws: ``HTSError/invalidArgument(message:)`` on failure.
+    public func setOption(_ option: CRAMOption, intValue: Int32) throws {
+        let ret = hts_shim_set_opt_int(pointer, option.rawValue, intValue)
+        if ret < 0 {
+            throw HTSError.invalidArgument(message: "Failed to set CRAM option")
+        }
+    }
+
+    /// Set a string CRAM option on this file.
+    ///
+    /// - Parameters:
+    ///   - option: The ``CRAMOption`` to set (typically `.reference`).
+    ///   - stringValue: The string value (e.g. path to reference FASTA).
+    /// - Throws: ``HTSError/invalidArgument(message:)`` on failure.
+    public func setOption(_ option: CRAMOption, stringValue: String) throws {
+        let ret = stringValue.withCString { hts_shim_set_opt_str(pointer, option.rawValue, $0) }
+        if ret < 0 {
+            throw HTSError.invalidArgument(message: "Failed to set CRAM option")
+        }
+    }
+
+    /// Set a compression profile preset on this file.
+    ///
+    /// - Parameter profile: The ``CompressionProfile`` to use.
+    /// - Throws: ``HTSError/invalidArgument(message:)`` on failure.
+    public func setCompressionProfile(_ profile: CompressionProfile) throws {
+        let ret = hts_shim_set_opt_int(pointer, HTS_OPT_PROFILE, Int32(profile.rawValue.rawValue))
+        if ret < 0 {
+            throw HTSError.invalidArgument(message: "Failed to set compression profile")
+        }
+    }
+
+    /// Set a filter expression for record filtering.
+    ///
+    /// - Parameter expression: The filter expression string.
+    /// - Throws: ``HTSError/invalidArgument(message:)`` on failure.
+    public func setFilterExpression(_ expression: String) throws {
+        let ret = expression.withCString { hts_set_filter_expression(pointer, $0) }
+        if ret < 0 {
+            throw HTSError.invalidArgument(message: "Failed to set filter expression: \(expression)")
+        }
+    }
+
     deinit {
         hts_close(pointer)
     }

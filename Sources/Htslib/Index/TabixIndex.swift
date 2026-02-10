@@ -67,6 +67,38 @@ public struct TabixIndex: ~Copyable, @unchecked Sendable {
         }
     }
 
+    // MARK: - Query
+
+    /// Create an iterator for records overlapping a region string.
+    ///
+    /// - Parameters:
+    ///   - region: A region string (e.g. `"chr1:1000-2000"`).
+    ///   - file: The open HTSFile for the tabix-indexed file.
+    /// - Returns: A ``TabixIterator`` for the matching records.
+    /// - Throws: ``HTSError/regionParseFailed(region:)`` if the region is invalid.
+    public func query(region: String, file: borrowing HTSFile) throws -> TabixIterator {
+        guard let iter = region.withCString({ hts_shim_tbx_itr_querys(pointer, $0) }) else {
+            throw HTSError.regionParseFailed(region: region)
+        }
+        return TabixIterator(file: file.pointer, tbx: pointer, iter: iter)
+    }
+
+    /// Create an iterator for records overlapping a numeric region.
+    ///
+    /// - Parameters:
+    ///   - tid: The sequence ID.
+    ///   - start: The 0-based start position.
+    ///   - end: The 0-based exclusive end position.
+    ///   - file: The open HTSFile for the tabix-indexed file.
+    /// - Returns: A ``TabixIterator`` for the matching records.
+    /// - Throws: ``HTSError/seekFailed`` if the iterator cannot be created.
+    public func query(tid: Int32, start: Int64, end: Int64, file: borrowing HTSFile) throws -> TabixIterator {
+        guard let iter = hts_shim_tbx_itr_queryi(pointer, tid, start, end) else {
+            throw HTSError.seekFailed
+        }
+        return TabixIterator(file: file.pointer, tbx: pointer, iter: iter)
+    }
+
     deinit {
         tbx_destroy(pointer)
     }

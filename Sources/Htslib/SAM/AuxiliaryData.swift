@@ -111,3 +111,95 @@ public struct AuxiliaryData: @unchecked Sendable {
         return errno == EINVAL ? nil : val
     }
 }
+
+// MARK: - MutableAuxiliaryData
+
+/// Provides mutable access to the auxiliary (tag) data of a BAM record.
+///
+/// Use this type to update, append, or delete auxiliary tags on a record.
+/// Obtain an instance via ``BAMRecord/mutableAuxiliaryData``.
+public struct MutableAuxiliaryData: @unchecked Sendable {
+    nonisolated(unsafe) private let record: UnsafeMutablePointer<bam1_t>
+
+    internal init(record: UnsafeMutablePointer<bam1_t>) {
+        self.record = record
+    }
+
+    /// Get raw aux tag data (mutable). Returns nil if tag not found.
+    private func rawGet(_ tag: String) -> UnsafeMutablePointer<UInt8>? {
+        tag.withCString { tagPtr in
+            bam_aux_get(record, tagPtr)
+        }
+    }
+
+    /// Update or append an integer auxiliary tag.
+    ///
+    /// If the tag already exists, its value is replaced. If not, it is appended.
+    /// - Parameters:
+    ///   - tag: A two-character tag name.
+    ///   - value: The integer value to set.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func updateInt(tag: String, value: Int64) throws {
+        precondition(tag.count == 2, "Aux tags must be exactly 2 characters")
+        let ret = tag.withCString { bam_aux_update_int(record, $0, value) }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Update or append a floating-point auxiliary tag.
+    ///
+    /// - Parameters:
+    ///   - tag: A two-character tag name.
+    ///   - value: The float value to set.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func updateFloat(tag: String, value: Float) throws {
+        precondition(tag.count == 2, "Aux tags must be exactly 2 characters")
+        let ret = tag.withCString { bam_aux_update_float(record, $0, value) }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Update or append a string auxiliary tag.
+    ///
+    /// - Parameters:
+    ///   - tag: A two-character tag name.
+    ///   - value: The string value to set.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func updateString(tag: String, value: String) throws {
+        precondition(tag.count == 2, "Aux tags must be exactly 2 characters")
+        let ret = tag.withCString { tagPtr in
+            value.withCString { valPtr in
+                bam_aux_update_str(record, tagPtr, Int32(value.utf8.count + 1), valPtr)
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Delete an auxiliary tag from the record.
+    ///
+    /// - Parameter tag: A two-character tag name.
+    /// - Throws: ``HTSError/tagNotFound(tag:)`` if the tag is not present,
+    ///           ``HTSError/writeFailed(code:)`` on other failure.
+    public func delete(tag: String) throws {
+        precondition(tag.count == 2, "Aux tags must be exactly 2 characters")
+        guard let data = rawGet(tag) else {
+            throw HTSError.tagNotFound(tag: tag)
+        }
+        let ret = bam_aux_del(record, data)
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Append raw auxiliary data to the record.
+    ///
+    /// - Parameters:
+    ///   - tag: A two-character tag name.
+    ///   - type: The BAM type character (`'A'`, `'i'`, `'f'`, `'Z'`, `'H'`, `'B'`).
+    ///   - length: Length of the data in bytes.
+    ///   - data: Pointer to the raw data.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public func append(tag: String, type: Character, length: Int, data: UnsafePointer<UInt8>) throws {
+        precondition(tag.count == 2, "Aux tags must be exactly 2 characters")
+        let ret = tag.withCString { tagPtr in
+            bam_aux_append(record, tagPtr, Int8(bitPattern: type.asciiValue ?? 0), Int32(length), data)
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+}

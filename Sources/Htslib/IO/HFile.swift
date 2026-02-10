@@ -79,6 +79,27 @@ public struct HFile: ~Copyable, @unchecked Sendable {
         return ret
     }
 
+    /// Flush any buffered write data to the underlying file.
+    ///
+    /// - Throws: ``HTSError/writeFailed(code:)`` on I/O error.
+    public func flush() throws {
+        let ret = hflush(pointer)
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Peek at upcoming bytes without consuming them.
+    ///
+    /// - Parameters:
+    ///   - buffer: Destination buffer.
+    ///   - length: Maximum number of bytes to peek.
+    /// - Returns: The number of bytes available (may be less than `length` near EOF).
+    /// - Throws: ``HTSError/readFailed(code:)`` on I/O error.
+    public func peek(into buffer: UnsafeMutableRawPointer, length: Int) throws -> Int {
+        let ret = hpeek(pointer, buffer, length)
+        if ret < 0 { throw HTSError.readFailed(code: Int32(ret)) }
+        return Int(ret)
+    }
+
     /// Check whether a path refers to a remote resource (HTTP, S3, etc.).
     ///
     /// - Parameter path: The file path or URL to check.

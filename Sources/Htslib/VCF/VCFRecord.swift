@@ -109,6 +109,39 @@ public struct VCFRecord: ~Copyable, @unchecked Sendable {
         VariantType(rawValue: bcf_get_variant_types(pointer))
     }
 
+    // MARK: - Mutation
+
+    /// Clear all fields and reset this record for reuse.
+    public mutating func clear() {
+        bcf_clear(pointer)
+    }
+
+    // MARK: - Copy / duplicate
+
+    /// Create an independent copy of this record by copying into a new allocation.
+    ///
+    /// - Returns: A new ``VCFRecord`` that is a deep copy of this one.
+    /// - Throws: ``HTSError/outOfMemory`` if allocation fails.
+    public borrowing func copy() throws -> VCFRecord {
+        guard let dst = bcf_init() else { throw HTSError.outOfMemory }
+        guard bcf_copy(dst, pointer) != nil else {
+            bcf_destroy(dst)
+            throw HTSError.outOfMemory
+        }
+        return VCFRecord(pointer: dst)
+    }
+
+    /// Duplicate this record (allocate + copy in one step).
+    ///
+    /// - Returns: A new ``VCFRecord`` that is a deep copy of this one.
+    /// - Throws: ``HTSError/outOfMemory`` if duplication fails.
+    public borrowing func duplicate() throws -> VCFRecord {
+        guard let dup = bcf_dup(pointer) else {
+            throw HTSError.outOfMemory
+        }
+        return VCFRecord(pointer: dup)
+    }
+
     deinit {
         bcf_destroy(pointer)
     }

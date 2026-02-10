@@ -108,9 +108,119 @@ public struct BAMRecord: ~Copyable, @unchecked Sendable {
 
     // MARK: - Auxiliary data
 
-    /// Accessor for auxiliary (tag) data attached to this record.
+    /// Accessor for auxiliary (tag) data attached to this record (read-only).
     public var auxiliaryData: AuxiliaryData {
         AuxiliaryData(record: pointer)
+    }
+
+    /// Accessor for mutable auxiliary (tag) data attached to this record.
+    ///
+    /// Use this to update, append, or delete auxiliary tags.
+    public var mutableAuxiliaryData: MutableAuxiliaryData {
+        MutableAuxiliaryData(record: pointer)
+    }
+
+    // MARK: - Construction helpers
+
+    /// Set all fields of this BAM record at once.
+    ///
+    /// - Parameters:
+    ///   - qname: Query template name.
+    ///   - flag: SAM FLAG value.
+    ///   - tid: Reference sequence ID (-1 if unmapped).
+    ///   - pos: 0-based leftmost mapping position (-1 if unmapped).
+    ///   - mapq: Mapping quality.
+    ///   - cigar: Array of CIGAR operations (encoded as raw uint32 values).
+    ///   - mtid: Mate reference sequence ID (-1 if unavailable).
+    ///   - mpos: 0-based mate mapping position (-1 if unavailable).
+    ///   - isize: Insert size (TLEN).
+    ///   - seq: Query sequence as ASCII string (A/C/G/T/N).
+    ///   - qual: Per-base quality string (ASCII Phred+33), or `nil` for unavailable.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func set(qname: String, flag: UInt16, tid: Int32, pos: Int64,
+                             mapq: UInt8, cigar: [UInt32], mtid: Int32, mpos: Int64,
+                             isize: Int64, seq: String, qual: String?) throws {
+        let ret = qname.withCString { qn in
+            seq.withCString { sq in
+                cigar.withUnsafeBufferPointer { cig in
+                    if let qual = qual {
+                        return qual.withCString { q in
+                            bam_set1(pointer,
+                                     qname.utf8.count, qn,
+                                     flag, tid, pos, mapq,
+                                     cigar.count, cig.baseAddress,
+                                     mtid, mpos, isize,
+                                     seq.utf8.count, sq, q,
+                                     0)
+                        }
+                    } else {
+                        return bam_set1(pointer,
+                                        qname.utf8.count, qn,
+                                        flag, tid, pos, mapq,
+                                        cigar.count, cig.baseAddress,
+                                        mtid, mpos, isize,
+                                        seq.utf8.count, sq, nil,
+                                        0)
+                    }
+                }
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Set the query name of this record.
+    ///
+    /// - Parameter name: The new query name.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setQueryName(_ name: String) throws {
+        let ret = name.withCString { bam_set_qname(pointer, $0) }
+        if ret < 0 { throw HTSError.writeFailed(code: Int32(ret)) }
+    }
+
+    /// Calculate the query sequence length from CIGAR operations.
+    ///
+    /// - Parameter cigar: Array of raw CIGAR uint32 values.
+    /// - Returns: The query length in bases.
+    public static func cigarQueryLength(_ cigar: [UInt32]) -> Int64 {
+        cigar.withUnsafeBufferPointer { buf in
+            bam_cigar2qlen(Int32(cigar.count), buf.baseAddress)
+        }
+    }
+
+    /// Calculate the reference sequence length from CIGAR operations.
+    ///
+    /// - Parameter cigar: Array of raw CIGAR uint32 values.
+    /// - Returns: The reference length in bases.
+    public static func cigarReferenceLength(_ cigar: [UInt32]) -> Int64 {
+        cigar.withUnsafeBufferPointer { buf in
+            bam_cigar2rlen(Int32(cigar.count), buf.baseAddress)
+        }
+    }
+
+    // MARK: - Copy / duplicate
+
+    /// Create an independent copy of this record by copying into a new allocation.
+    ///
+    /// - Returns: A new ``BAMRecord`` that is a deep copy of this one.
+    /// - Throws: ``HTSError/outOfMemory`` if allocation fails.
+    public borrowing func copy() throws -> BAMRecord {
+        guard let dst = bam_init1() else { throw HTSError.outOfMemory }
+        guard bam_copy1(dst, pointer) != nil else {
+            bam_destroy1(dst)
+            throw HTSError.outOfMemory
+        }
+        return BAMRecord(pointer: dst)
+    }
+
+    /// Duplicate this record (allocate + copy in one step).
+    ///
+    /// - Returns: A new ``BAMRecord`` that is a deep copy of this one.
+    /// - Throws: ``HTSError/outOfMemory`` if duplication fails.
+    public borrowing func duplicate() throws -> BAMRecord {
+        guard let dup = bam_dup1(pointer) else {
+            throw HTSError.outOfMemory
+        }
+        return BAMRecord(pointer: dup)
     }
 
     deinit {

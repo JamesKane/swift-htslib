@@ -99,6 +99,79 @@ public final class VCFHeader: @unchecked Sendable {
         if ret < 0 { throw HTSError.headerWriteFailed }
     }
 
+    // MARK: - Extended operations
+
+    /// Remove a header line by type and key.
+    ///
+    /// - Parameters:
+    ///   - type: The header line type (`BCF_HL_FLT`, `BCF_HL_INFO`, `BCF_HL_FMT`,
+    ///     `BCF_HL_CTG`, `BCF_HL_STR`, `BCF_HL_GEN`).
+    ///   - key: The key (ID) to remove.
+    public func remove(type: Int32, key: String) {
+        key.withCString { bcf_hdr_remove(pointer, type, $0) }
+    }
+
+    /// Set which samples to include when reading records.
+    ///
+    /// - Parameters:
+    ///   - samples: Comma-separated sample names, `-` for no samples, or a filename prefixed with `file:`.
+    ///   - isFile: If `true`, `samples` is a filename containing sample names.
+    /// - Returns: 0 on success, negative on failure.
+    @discardableResult
+    public func setSamples(_ samples: String, isFile: Bool = false) -> Int32 {
+        let str = isFile ? "file:\(samples)" : samples
+        return str.withCString { bcf_hdr_set_samples(pointer, $0, 0) }
+    }
+
+    /// The names of all contigs (sequences) defined in the header.
+    public var sequenceNames: [String] {
+        var n: Int32 = 0
+        guard let names = bcf_hdr_seqnames(pointer, &n) else { return [] }
+        defer { free(names) }
+        return (0..<Int(n)).compactMap { i in
+            guard let s = names[i] else { return nil }
+            return String(cString: s)
+        }
+    }
+
+    /// The VCF version string (e.g. `"VCFv4.3"`).
+    public var version: String? {
+        guard let v = bcf_hdr_get_version(pointer) else { return nil }
+        return String(cString: v)
+    }
+
+    /// Set the VCF version string.
+    ///
+    /// - Parameter version: The version string (e.g. `"VCFv4.3"`).
+    /// - Returns: 0 on success, negative on failure.
+    @discardableResult
+    public func setVersion(_ version: String) -> Int32 {
+        version.withCString { bcf_hdr_set_version(pointer, $0) }
+    }
+
+    /// Create a new header containing only the specified samples.
+    ///
+    /// - Parameter samples: Array of sample names to include.
+    /// - Returns: A new ``VCFHeader`` with only the specified samples, or `nil` on failure.
+    public func subset(samples: [String]) -> VCFHeader? {
+        let n = Int32(samples.count)
+        let imap = UnsafeMutablePointer<Int32>.allocate(capacity: samples.count)
+        defer { imap.deallocate() }
+        // Create a C array of C strings
+        let cStrings = samples.map { strdup($0) }
+        defer { cStrings.forEach { free($0) } }
+        let result = cStrings.withUnsafeBufferPointer { buf in
+            let ptrs = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: samples.count)
+            for i in 0..<samples.count {
+                ptrs[i] = buf[i]
+            }
+            defer { ptrs.deallocate() }
+            return bcf_hdr_subset(pointer, n, ptrs, imap)
+        }
+        guard let hdr = result else { return nil }
+        return VCFHeader(pointer: hdr)
+    }
+
     deinit {
         if owned { bcf_hdr_destroy(pointer) }
     }

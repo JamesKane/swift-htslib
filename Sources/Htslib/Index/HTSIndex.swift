@@ -56,6 +56,20 @@ public struct HTSIndex: ~Copyable, @unchecked Sendable {
         }
     }
 
+    /// Build an index for a VCF/BCF file.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the VCF/BCF file.
+    ///   - minShift: Minimum bit-shift for CSI indices (0 for default TBI).
+    ///   - nThreads: Number of threads for building (0 for single-threaded).
+    /// - Throws: ``HTSError/indexBuildFailed(path:code:)`` on failure.
+    public static func buildVCF(path: String, minShift: Int32 = 0, nThreads: Int32 = 0) throws {
+        let ret = path.withCString { bcf_index_build3($0, nil, minShift, nThreads) }
+        if ret < 0 {
+            throw HTSError.indexBuildFailed(path: path, code: ret)
+        }
+    }
+
     deinit {
         hts_idx_destroy(pointer)
     }
