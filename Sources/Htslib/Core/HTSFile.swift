@@ -187,6 +187,57 @@ public struct HTSFile: ~Copyable, @unchecked Sendable {
         }
     }
 
+    // MARK: - SAM/BAM factory methods
+
+    /// Read the SAM/BAM/CRAM header from this file.
+    ///
+    /// - Returns: The ``SAMHeader`` for this file.
+    /// - Throws: ``HTSError/headerReadFailed`` if the header cannot be read.
+    public func samHeader() throws -> SAMHeader {
+        try SAMHeader(from: self)
+    }
+
+    /// Create a sequential iterator over all alignment records in this file.
+    ///
+    /// - Parameter header: The ``SAMHeader`` obtained from ``samHeader()``.
+    /// - Returns: A ``SAMRecordIterator`` yielding all records.
+    public func samIterator(header: SAMHeader) -> SAMRecordIterator {
+        SAMRecordIterator(file: pointer, header: header.pointer)
+    }
+
+    /// Create an indexed iterator over alignment records overlapping a region.
+    ///
+    /// - Parameters:
+    ///   - header: The ``SAMHeader`` obtained from ``samHeader()``.
+    ///   - index: The ``HTSIndex`` for this file.
+    ///   - region: A region string (e.g. `"chr1:1000-2000"`).
+    /// - Returns: A ``SAMQueryIterator`` yielding overlapping records.
+    /// - Throws: ``HTSError/seekFailed`` if the query cannot be created.
+    public func samQueryIterator(header: SAMHeader, index: borrowing HTSIndex, region: String) throws -> SAMQueryIterator {
+        guard let itr = region.withCString({ sam_itr_querys(index.pointer, header.pointer, $0) }) else {
+            throw HTSError.seekFailed
+        }
+        return SAMQueryIterator(file: pointer, iterator: itr)
+    }
+
+    // MARK: - VCF/BCF factory methods
+
+    /// Read the VCF/BCF header from this file.
+    ///
+    /// - Returns: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/headerReadFailed`` if the header cannot be read.
+    public func vcfHeader() throws -> VCFHeader {
+        try VCFHeader(from: self)
+    }
+
+    /// Create a sequential iterator over all variant records in this file.
+    ///
+    /// - Parameter header: The ``VCFHeader`` obtained from ``vcfHeader()``.
+    /// - Returns: A ``VCFRecordIterator`` yielding all records.
+    public func vcfIterator(header: VCFHeader) -> VCFRecordIterator {
+        VCFRecordIterator(file: pointer, header: header.pointer)
+    }
+
     deinit {
         hts_close(pointer)
     }

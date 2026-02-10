@@ -116,6 +116,141 @@ public struct VCFRecord: ~Copyable, @unchecked Sendable {
         bcf_clear(pointer)
     }
 
+    /// Set the 0-based position on the reference contig.
+    public mutating func setPosition(_ pos: Int64) {
+        pointer.pointee.pos = pos
+    }
+
+    /// Set the reference contig ID.
+    public mutating func setContigID(_ rid: Int32) {
+        pointer.pointee.rid = rid
+    }
+
+    /// Set the variant quality score (Phred-scaled).
+    public mutating func setQuality(_ qual: Float) {
+        pointer.pointee.qual = qual
+    }
+
+    /// Set the alleles from a comma-separated string (e.g. `"A,T"` or `"ACG,A,ACGT"`).
+    ///
+    /// - Parameters:
+    ///   - allelesStr: Comma-separated allele string (REF first, then ALTs).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setAlleles(_ allelesStr: String, header: VCFHeader) throws {
+        let ret = allelesStr.withCString { ptr in
+            bcf_update_alleles_str(header.pointer, pointer, ptr)
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Set the genotype (GT) FORMAT field for all samples.
+    ///
+    /// Each element should be encoded using ``bcfGenotypeUnphased(_:)``
+    /// or ``bcfGenotypePhased(_:)``.
+    ///
+    /// - Parameters:
+    ///   - genotypes: Encoded genotype values (ploidy × nSamples elements).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setGenotypes(_ genotypes: [Int32], header: VCFHeader) throws {
+        var gts = genotypes
+        let ret = gts.withUnsafeMutableBufferPointer { buf in
+            hts_shim_bcf_update_genotypes(header.pointer, pointer, buf.baseAddress, Int32(buf.count))
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Set an integer FORMAT field for all samples.
+    ///
+    /// - Parameters:
+    ///   - tag: The FORMAT tag name (e.g. `"GQ"`, `"DP"`, `"AD"`).
+    ///   - values: Integer values (nValues × nSamples elements).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setFormatInt32(tag: String, values: [Int32], header: VCFHeader) throws {
+        var vals = values
+        let ret = tag.withCString { key in
+            vals.withUnsafeMutableBufferPointer { buf in
+                hts_shim_bcf_update_format_int32(header.pointer, pointer, key, buf.baseAddress, Int32(buf.count))
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Set a float FORMAT field for all samples.
+    ///
+    /// - Parameters:
+    ///   - tag: The FORMAT tag name (e.g. `"GL"`).
+    ///   - values: Float values (nValues × nSamples elements).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setFormatFloat(tag: String, values: [Float], header: VCFHeader) throws {
+        var vals = values
+        let ret = tag.withCString { key in
+            vals.withUnsafeMutableBufferPointer { buf in
+                hts_shim_bcf_update_format_float(header.pointer, pointer, key, buf.baseAddress, Int32(buf.count))
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Set an integer INFO field.
+    ///
+    /// - Parameters:
+    ///   - tag: The INFO tag name (e.g. `"DP"`).
+    ///   - values: Integer values.
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setInfoInt32(tag: String, values: [Int32], header: VCFHeader) throws {
+        var vals = values
+        let ret = tag.withCString { key in
+            vals.withUnsafeMutableBufferPointer { buf in
+                hts_shim_bcf_update_info_int32(header.pointer, pointer, key, buf.baseAddress, Int32(buf.count))
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    /// Set a string INFO field.
+    ///
+    /// - Parameters:
+    ///   - tag: The INFO tag name.
+    ///   - value: The string value.
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Throws: ``HTSError/writeFailed(code:)`` on failure.
+    public mutating func setInfoString(tag: String, value: String, header: VCFHeader) throws {
+        let ret = tag.withCString { key in
+            value.withCString { val in
+                hts_shim_bcf_update_info_string(header.pointer, pointer, key, val)
+            }
+        }
+        if ret < 0 { throw HTSError.writeFailed(code: ret) }
+    }
+
+    // MARK: - Genotype encoding helpers
+
+    /// Encode an unphased genotype allele index for use with ``setGenotypes(_:header:)``.
+    ///
+    /// - Parameter alleleIndex: 0-based allele index (0 = REF, 1 = first ALT, etc.).
+    /// - Returns: Encoded genotype value.
+    public static func bcfGenotypeUnphased(_ alleleIndex: Int32) -> Int32 {
+        hts_shim_bcf_gt_unphased(alleleIndex)
+    }
+
+    /// Encode a phased genotype allele index for use with ``setGenotypes(_:header:)``.
+    ///
+    /// - Parameter alleleIndex: 0-based allele index.
+    /// - Returns: Encoded genotype value.
+    public static func bcfGenotypePhased(_ alleleIndex: Int32) -> Int32 {
+        hts_shim_bcf_gt_phased(alleleIndex)
+    }
+
+    /// The encoded value for a missing genotype allele.
+    public static var bcfGenotypeMissing: Int32 {
+        hts_shim_bcf_gt_missing()
+    }
+
     // MARK: - Copy / duplicate
 
     /// Create an independent copy of this record by copying into a new allocation.
