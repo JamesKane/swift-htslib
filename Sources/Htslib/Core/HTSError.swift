@@ -1,3 +1,6 @@
+// Copyright (c) 2026 James Kane. All rights reserved.
+// Licensed under the BSD 3-Clause License. See LICENSE.md in the project root.
+
 /// Errors thrown by swift-htslib operations.
 public enum HTSError: Error, Sendable {
     /// A file could not be opened at the given path with the given mode.

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 James Kane. All rights reserved.
+// Licensed under the BSD 3-Clause License. See LICENSE.md in the project root.
+
 import CHtslib
 
 /// A generic HTS index (BAI, CSI, or TBI) for indexed random access.
