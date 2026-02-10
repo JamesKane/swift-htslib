@@ -144,4 +144,4 @@ The `Htslib` target is organized into these logical modules:
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE.md) for details.
