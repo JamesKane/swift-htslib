@@ -2,7 +2,14 @@ import CHtslib
 import CHTSlibShims
 
 /// Iterates all records sequentially from a SAM/BAM/CRAM file.
-/// Usage: `while let record = iterator.next() { ... }`
+///
+/// Since ``BAMRecord`` is `~Copyable`, this class cannot conform to `IteratorProtocol`.
+/// Use a `while let` loop instead:
+/// ```swift
+/// while let record = iterator.next() {
+///     print(record.queryName)
+/// }
+/// ```
 public final class SAMRecordIterator {
     private let file: UnsafeMutablePointer<htsFile>
     private let header: UnsafeMutablePointer<sam_hdr_t>
@@ -15,6 +22,9 @@ public final class SAMRecordIterator {
         self.record = bam_init1()
     }
 
+    /// Read the next alignment record.
+    ///
+    /// - Returns: The next ``BAMRecord``, or `nil` at end-of-file.
     public func next() -> BAMRecord? {
         guard !exhausted, let rec = record else { return nil }
         let ret = sam_read1(file, header, rec)
@@ -35,8 +45,15 @@ public final class SAMRecordIterator {
     }
 }
 
-/// Iterates records in a region using an index.
-/// Usage: `while let record = iterator.next() { ... }`
+/// Iterates records overlapping a genomic region using an index.
+///
+/// Since ``BAMRecord`` is `~Copyable`, this class cannot conform to `IteratorProtocol`.
+/// Use a `while let` loop instead:
+/// ```swift
+/// while let record = iterator.next() {
+///     print(record.queryName)
+/// }
+/// ```
 public final class SAMQueryIterator {
     private let file: UnsafeMutablePointer<htsFile>
     private let iterator: UnsafeMutablePointer<hts_itr_t>
@@ -50,6 +67,9 @@ public final class SAMQueryIterator {
         self.record = bam_init1()
     }
 
+    /// Read the next alignment record in the queried region.
+    ///
+    /// - Returns: The next ``BAMRecord`` overlapping the region, or `nil` when exhausted.
     public func next() -> BAMRecord? {
         guard !exhausted, let rec = record else { return nil }
         let ret = hts_shim_sam_itr_next(file, iterator, rec)

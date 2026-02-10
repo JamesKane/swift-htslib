@@ -68,6 +68,9 @@ public final class SyncedBCFReader {
     // MARK: - Readers
 
     /// Add a VCF/BCF file to the synced reader.
+    ///
+    /// - Parameter path: Path to the VCF/BCF file.
+    /// - Throws: ``HTSError/openFailed(path:mode:)`` if the file cannot be opened.
     public func addReader(path: String) throws {
         let ret = path.withCString { bcf_sr_add_reader(pointer, $0) }
         if ret != 1 {
@@ -75,7 +78,9 @@ public final class SyncedBCFReader {
         }
     }
 
-    /// Remove a reader by index.
+    /// Remove a reader by its 0-based index.
+    ///
+    /// - Parameter index: The reader index to remove.
     public func removeReader(at index: Int) {
         bcf_sr_remove_reader(pointer, Int32(index))
     }
@@ -110,18 +115,35 @@ public final class SyncedBCFReader {
     // MARK: - Regions and targets
 
     /// Set regions to iterate over.
+    ///
+    /// - Parameters:
+    ///   - regions: A comma-separated region string or file path.
+    ///   - isFile: If `true`, treat `regions` as a path to a file containing regions.
+    /// - Returns: 0 on success, negative on failure.
     @discardableResult
     public func setRegions(_ regions: String, isFile: Bool = false) -> Int32 {
         regions.withCString { bcf_sr_set_regions(pointer, $0, isFile ? 1 : 0) }
     }
 
     /// Set targets to restrict iteration.
+    ///
+    /// Unlike regions, targets are used for filtering rather than seeking.
+    /// - Parameters:
+    ///   - targets: A comma-separated target string or file path.
+    ///   - isFile: If `true`, treat `targets` as a path to a file containing targets.
+    ///   - alleles: Allele matching mode (0 for default).
+    /// - Returns: 0 on success, negative on failure.
     @discardableResult
     public func setTargets(_ targets: String, isFile: Bool = false, alleles: Int32 = 0) -> Int32 {
         targets.withCString { bcf_sr_set_targets(pointer, $0, isFile ? 1 : 0, alleles) }
     }
 
-    /// Seek to a specific position.
+    /// Seek to a specific genomic position.
+    ///
+    /// - Parameters:
+    ///   - contig: The contig name (e.g. `"chr1"`).
+    ///   - position: 0-based position on the contig.
+    /// - Returns: 0 on success, negative on failure.
     @discardableResult
     public func seek(contig: String, position: Int64) -> Int32 {
         contig.withCString { bcf_sr_seek(pointer, $0, position) }

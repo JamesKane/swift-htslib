@@ -1,13 +1,40 @@
 import CHtslib
 
+/// The exact file format detected by htslib.
 public enum HTSFileFormat: Sendable {
-    case sam, bam, cram
-    case vcf, bcf
-    case bai, crai, csi, gzi, tbi
+    /// SAM text alignment format.
+    case sam
+    /// BAM binary alignment format.
+    case bam
+    /// CRAM compressed alignment format.
+    case cram
+    /// VCF text variant call format.
+    case vcf
+    /// BCF binary variant call format.
+    case bcf
+    /// BAM index (.bai).
+    case bai
+    /// CRAM index (.crai).
+    case crai
+    /// Coordinate-sorted index (.csi).
+    case csi
+    /// BGZF index (.gzi).
+    case gzi
+    /// Tabix index (.tbi).
+    case tbi
+    /// BED region format.
     case bed
-    case fasta, fastq
-    case fai, fqi
+    /// FASTA sequence format.
+    case fasta
+    /// FASTQ sequence format.
+    case fastq
+    /// FASTA index (.fai).
+    case fai
+    /// FASTQ index (.fqi).
+    case fqi
+    /// Empty/unset format.
     case emptyFormat
+    /// Unrecognized format.
     case unknown
 
     init(from cFormat: htsExactFormat) {
@@ -33,11 +60,17 @@ public enum HTSFileFormat: Sendable {
     }
 }
 
+/// The high-level category of an HTS file format.
 public enum HTSFormatCategory: Sendable {
+    /// Unrecognized category.
     case unknownCategory
+    /// Sequence data (SAM/BAM/CRAM/FASTA/FASTQ).
     case sequenceData
+    /// Variant data (VCF/BCF).
     case variantData
+    /// Index file (BAI/CSI/TBI/CRAI).
     case indexFile
+    /// Region list (BED).
     case regionList
 
     init(from cCategory: htsFormatCategory) {

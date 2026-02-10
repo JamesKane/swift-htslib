@@ -1,10 +1,19 @@
 import CHtslib
 
+/// A generic HTS index (BAI, CSI, or TBI) for indexed random access.
+///
+/// Load an index alongside a BAM/CRAM/VCF file to enable region queries.
+/// This is a move-only type that destroys the index on deinitialization.
 public struct HTSIndex: ~Copyable, @unchecked Sendable {
     @usableFromInline
     nonisolated(unsafe) var pointer: OpaquePointer  // hts_idx_t*
 
-    /// Load an index for the given file
+    /// Load an index for the given file.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the data file (the index is located automatically).
+    ///   - format: The expected index format, or `.auto` to auto-detect.
+    /// - Throws: ``HTSError/indexLoadFailed(path:)`` if the index cannot be loaded.
     public init(path: String, format: IndexFormat = .auto) throws {
         guard let idx = path.withCString({ hts_idx_load3($0, nil, format.rawValue, 0) }) else {
             throw HTSError.indexLoadFailed(path: path)
@@ -16,19 +25,30 @@ public struct HTSIndex: ~Copyable, @unchecked Sendable {
         self.pointer = pointer
     }
 
+    /// The index file format.
     public enum IndexFormat: Int32, Sendable {
-        case auto = 0   // HTS_FMT_CSI or HTS_FMT_BAI auto-detect
-        case bai = 1     // HTS_FMT_BAI
-        case csi = 2     // HTS_FMT_CSI
-        case tbi = 3     // HTS_FMT_TBI
+        /// Auto-detect the index format.
+        case auto = 0
+        /// BAM index (.bai).
+        case bai = 1
+        /// Coordinate-sorted index (.csi).
+        case csi = 2
+        /// Tabix index (.tbi).
+        case tbi = 3
     }
 
-    /// Get the number of reference sequences in the index
+    /// The number of reference sequences in the index.
     public func nSequences() -> Int32 {
         hts_idx_nseq(pointer)
     }
 
-    /// Build an index for a file
+    /// Build an index for a SAM/BAM/CRAM file.
+    ///
+    /// - Parameters:
+    ///   - path: Path to the data file.
+    ///   - minShift: Minimum bit-shift for CSI indices (0 for BAI default).
+    ///   - nThreads: Number of threads for building (0 for single-threaded).
+    /// - Throws: ``HTSError/indexBuildFailed(path:code:)`` on failure.
     public static func build(path: String, minShift: Int32 = 0, nThreads: Int32 = 0) throws {
         let ret = path.withCString { sam_index_build3($0, nil, minShift, nThreads) }
         if ret < 0 {

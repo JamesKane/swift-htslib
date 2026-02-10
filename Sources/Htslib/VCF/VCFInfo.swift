@@ -1,8 +1,14 @@
 import CHtslib
 import CHTSlibShims
 
-/// Typed access to VCF INFO fields
+/// Typed access to VCF INFO fields.
 extension VCFRecord {
+    /// Get integer values from an INFO field.
+    ///
+    /// - Parameters:
+    ///   - key: The INFO field key (e.g. `"DP"`, `"AC"`).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Returns: An array of `Int32` values, or `nil` if the field is absent.
     public func infoInt32(forKey key: String, header: VCFHeader) -> [Int32]? {
         var dst: UnsafeMutablePointer<Int32>? = nil
         var ndst: Int32 = 0
@@ -14,6 +20,12 @@ extension VCFRecord {
         return Array(UnsafeBufferPointer(start: buf, count: Int(ret)))
     }
 
+    /// Get floating-point values from an INFO field.
+    ///
+    /// - Parameters:
+    ///   - key: The INFO field key (e.g. `"AF"`).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Returns: An array of `Float` values, or `nil` if the field is absent.
     public func infoFloat(forKey key: String, header: VCFHeader) -> [Float]? {
         var dst: UnsafeMutablePointer<Float>? = nil
         var ndst: Int32 = 0
@@ -25,6 +37,12 @@ extension VCFRecord {
         return Array(UnsafeBufferPointer(start: buf, count: Int(ret)))
     }
 
+    /// Get a string value from an INFO field.
+    ///
+    /// - Parameters:
+    ///   - key: The INFO field key (e.g. `"DB"`).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Returns: The string value, or `nil` if the field is absent.
     public func infoString(forKey key: String, header: VCFHeader) -> String? {
         var dst: UnsafeMutablePointer<UInt8>? = nil
         var ndst: Int32 = 0
@@ -36,6 +54,12 @@ extension VCFRecord {
         return String(cString: buf)
     }
 
+    /// Check whether an INFO flag is set.
+    ///
+    /// - Parameters:
+    ///   - key: The INFO flag key (e.g. `"DB"`).
+    ///   - header: The ``VCFHeader`` for this file.
+    /// - Returns: `true` if the flag is present.
     public func infoFlag(forKey key: String, header: VCFHeader) -> Bool {
         var dst: UnsafeMutableRawPointer? = nil
         var ndst: Int32 = 0

@@ -5,22 +5,25 @@ import CHTSlibShims
 
 /// A column of multi-sample pileup data at a single genomic position.
 public struct MultiPileupColumn: Sendable {
-    /// Reference sequence ID
+    /// Reference sequence ID.
     public let contigID: Int32
-    /// 0-based position on the reference
+    /// 0-based position on the reference.
     public let position: Int64
-    /// Per-sample pileup entries (one array per sample)
+    /// Per-sample pileup entries (one array per sample).
     public let sampleEntries: [[PileupEntry]]
 
-    /// Number of samples
+    /// Number of samples.
     public var nSamples: Int { sampleEntries.count }
 
-    /// Depth for a specific sample
+    /// Depth for a specific sample.
+    ///
+    /// - Parameter index: 0-based sample index.
+    /// - Returns: The number of reads covering this position for the given sample.
     public func depth(forSample index: Int) -> Int {
         sampleEntries[index].count
     }
 
-    /// Total depth across all samples
+    /// Total depth across all samples.
     public var totalDepth: Int {
         sampleEntries.reduce(0) { $0 + $1.count }
     }
