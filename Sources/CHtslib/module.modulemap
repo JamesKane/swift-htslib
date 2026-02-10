@@ -1,0 +1,5 @@
+module CHtslib [system] {
+    header "shim.h"
+    link "hts"
+    export *
+}

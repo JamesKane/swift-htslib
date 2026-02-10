@@ -1,0 +1,48 @@
+import CHtslib
+import CHTSlibShims
+
+/// Typed access to VCF INFO fields
+extension VCFRecord {
+    public func infoInt32(forKey key: String, header: VCFHeader) -> [Int32]? {
+        var dst: UnsafeMutablePointer<Int32>? = nil
+        var ndst: Int32 = 0
+        let ret = key.withCString { k in
+            hts_shim_bcf_get_info_int32(header.pointer, pointer, k, &dst, &ndst)
+        }
+        guard ret > 0, let buf = dst else { return nil }
+        defer { free(buf) }
+        return Array(UnsafeBufferPointer(start: buf, count: Int(ret)))
+    }
+
+    public func infoFloat(forKey key: String, header: VCFHeader) -> [Float]? {
+        var dst: UnsafeMutablePointer<Float>? = nil
+        var ndst: Int32 = 0
+        let ret = key.withCString { k in
+            hts_shim_bcf_get_info_float(header.pointer, pointer, k, &dst, &ndst)
+        }
+        guard ret > 0, let buf = dst else { return nil }
+        defer { free(buf) }
+        return Array(UnsafeBufferPointer(start: buf, count: Int(ret)))
+    }
+
+    public func infoString(forKey key: String, header: VCFHeader) -> String? {
+        var dst: UnsafeMutablePointer<UInt8>? = nil
+        var ndst: Int32 = 0
+        let ret = key.withCString { k in
+            hts_shim_bcf_get_info_string(header.pointer, pointer, k, &dst, &ndst)
+        }
+        guard ret > 0, let buf = dst else { return nil }
+        defer { free(buf) }
+        return String(cString: buf)
+    }
+
+    public func infoFlag(forKey key: String, header: VCFHeader) -> Bool {
+        var dst: UnsafeMutableRawPointer? = nil
+        var ndst: Int32 = 0
+        let ret = key.withCString { k in
+            hts_shim_bcf_get_info_flag(header.pointer, pointer, k, &dst, &ndst)
+        }
+        if let d = dst { free(d) }
+        return ret == 1
+    }
+}
