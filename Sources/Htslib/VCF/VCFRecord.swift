@@ -254,6 +254,12 @@ public struct VCFRecord: ~Copyable, @unchecked Sendable {
         hts_shim_bcf_gt_missing()
     }
 
+    /// The encoded value for vector end (used to pad shorter per-sample arrays
+    /// when samples have different ploidies).
+    public static var bcfInt32VectorEnd: Int32 {
+        hts_shim_bcf_int32_vector_end()
+    }
+
     // MARK: - Copy / duplicate
 
     /// Create an independent copy of this record by copying into a new allocation.
